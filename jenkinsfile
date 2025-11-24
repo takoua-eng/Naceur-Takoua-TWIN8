@@ -1,27 +1,63 @@
 pipeline {
+    agent any
 
- agent any
+    environment {
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
+        DOCKERHUB_USER = "takouanaceur"
+        IMAGE_NAME = "student-management"
+    }
 
- tools {
-    jdk 'JAVA_HOME'
-    maven 'M2_HOME'
- }
+    tools {
+        jdk 'JAVA_HOME'
+        maven 'M2_HOME'
+    }
 
- stages {
+    stages {
 
-    stage('GIT') {
-        steps {
-            git branch: 'master',
-            url: 'https://github.com/hwafa/timesheetproject.git'
+        stage('Checkout GIT') {
+            steps {
+                git branch: 'main',
+                    url: 'https://github.com/takoua-eng/Naceur-Takoua-TWIN8.git'
+            }
+        }
+
+        stage('Build Maven') {
+            steps {
+                sh 'mvn clean package -DskipTests'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh """
+                docker build -t ${takouanaceur}/${student-management}:latest .
+                """
+            }
+        }
+
+        stage('Login to Docker Hub') {
+            steps {
+                sh """
+                echo "${DOCKERHUB_CREDENTIALS_PSW}" | docker login -u "${DOCKERHUB_CREDENTIALS_USR}" --password-stdin
+                """
+            }
+        }
+
+        stage('Push to Docker Hub') {
+            steps {
+                sh """
+                docker push ${takouanaceur}/${student-management}:latest
+                """
+            }
         }
     }
 
-    stage ('Compile Stage') {
-        steps {
-            sh 'mvn clean compile'
+    post {
+        success {
+            echo "Pipeline terminé avec succès ! Image envoyée sur Docker Hub."
+        }
+        failure {
+            echo "ÉCHEC du pipeline."
         }
     }
-
- }
-
 }
