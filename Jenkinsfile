@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         DOCKER_USER = 'takouanaceur'
-        APP_IMAGE   = 'takouanaceur/student-management:latest'
+        IMAGE_NAME = 'student-management'
     }
 
     stages {
@@ -20,9 +20,19 @@ pipeline {
             }
         }
 
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+                        sh 'mvn sonar:sonar -Dsonar.login=$SONAR_TOKEN'
+                    }
+                }
+            }
+        }
+
         stage('Build Docker Image') {
             steps {
-                sh 'docker build -t $APP_IMAGE .'
+                sh 'docker build -t $DOCKER_USER/$IMAGE_NAME:latest .'
             }
         }
 
@@ -36,43 +46,19 @@ pipeline {
 
         stage('Push Docker Image') {
             steps {
-                sh 'docker push $APP_IMAGE'
+                sh 'docker push $DOCKER_USER/$IMAGE_NAME:latest'
             }
         }
 
-        stage('Deploy MySQL to Kubernetes') {
+        stage('Deploy to Kubernetes') {
             steps {
-                withCredentials([file(credentialsId: 'kubeconfig-cred', variable: 'KUBECONFIG')]) {
+                withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG')]) {
                     sh '''
-                      kubectl apply -f mysql-deployment.yaml
-                      kubectl apply -f mysql-service.yaml
-                    '''
-                }
-            }
-        }
-
-        stage('Deploy Spring Boot to Kubernetes') {
-            steps {
-                withCredentials([file(credentialsId: 'kubeconfig-cred', variable: 'KUBECONFIG')]) {
-                    sh '''
-                      kubectl apply -f deployment.yaml
-                      kubectl apply -f service.yaml
-                      kubectl rollout status deployment/student-management
-                    '''
-                }
-            }
-        }
-
-        stage('K8s Smoke Test') {
-            steps {
-                withCredentials([file(credentialsId: 'kubeconfig-cred', variable: 'KUBECONFIG')]) {
-                    sh '''
-                      kubectl get pods
-                      kubectl get svc
+                    kubectl apply -f k8s/
+                    kubectl rollout status deployment/student-management
                     '''
                 }
             }
         }
     }
 }
-
