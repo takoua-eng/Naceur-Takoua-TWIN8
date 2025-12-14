@@ -58,14 +58,14 @@ pipeline {
             }
         }
 
-        stage('Deploy to Kubernetes') {
+        stage('K8s - Smoke Test') {
             steps {
-                withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG')]) {
-                    sh '''
-                    kubectl apply -f k8s/
-                    kubectl rollout status deployment/student-management
-                    '''
-                }
+                sh '''
+                kubectl version --client
+                kubectl config current-context
+                kubectl get nodes
+                kubectl get namespaces | head -n 20
+                '''
             }
         }
     }
