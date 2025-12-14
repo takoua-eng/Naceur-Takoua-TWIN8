@@ -44,8 +44,8 @@ pipeline {
             steps {
                 withCredentials([file(credentialsId: 'kubeconfig-cred', variable: 'KUBECONFIG')]) {
                     sh '''
-                      kubectl apply -f k8s/mysql/deployment.yaml
-                      kubectl apply -f k8s/mysql/service.yaml
+                      kubectl apply -f mysql-deployment.yaml
+                      kubectl apply -f mysql-service.yaml
                     '''
                 }
             }
@@ -55,8 +55,8 @@ pipeline {
             steps {
                 withCredentials([file(credentialsId: 'kubeconfig-cred', variable: 'KUBECONFIG')]) {
                     sh '''
-                      kubectl apply -f k8s/spring/deployment.yaml
-                      kubectl apply -f k8s/spring/service.yaml
+                      kubectl apply -f deployment.yaml
+                      kubectl apply -f service.yaml
                       kubectl rollout status deployment/student-management
                     '''
                 }
