@@ -2,22 +2,15 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
-        DOCKERHUB_USER = "takouanaceur"
-        IMAGE_NAME = "student-management"
-    }
-
-    tools {
-        jdk 'JAVA_HOME'
-        maven 'M2_HOME'
+        DOCKER_USER = 'takouanaceur'
+        APP_IMAGE   = 'takouanaceur/student-management:latest'
     }
 
     stages {
 
-        stage('Checkout GIT') {
+        stage('Checkout SCM') {
             steps {
-                git branch: 'main',
-                    url: 'https://github.com/takoua-eng/Naceur-Takoua-TWIN8.git'
+                checkout scm
             }
         }
 
@@ -29,35 +22,57 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                sh """
-                docker build -t ${takouanaceur}/${student-management}:latest .
-                """
+                sh 'docker build -t $APP_IMAGE .'
             }
         }
 
         stage('Login to Docker Hub') {
             steps {
-                sh """
-                echo "${DOCKERHUB_CREDENTIALS_PSW}" | docker login -u "${DOCKERHUB_CREDENTIALS_USR}" --password-stdin
-                """
+                withCredentials([string(credentialsId: 'docker-hub-token', variable: 'DOCKER_HUB_TOKEN')]) {
+                    sh 'echo $DOCKER_HUB_TOKEN | docker login -u $DOCKER_USER --password-stdin'
+                }
             }
         }
 
-        stage('Push to Docker Hub') {
+        stage('Push Docker Image') {
             steps {
-                sh """
-                docker push ${takouanaceur}/${student-management}:latest
-                """
+                sh 'docker push $APP_IMAGE'
             }
         }
-    }
 
-    post {
-        success {
-            echo "Pipeline terminé avec succès ! Image envoyée sur Docker Hub."
+        stage('Deploy MySQL to Kubernetes') {
+            steps {
+                withCredentials([file(credentialsId: 'kubeconfig-cred', variable: 'KUBECONFIG')]) {
+                    sh '''
+                      kubectl apply -f k8s/mysql/deployment.yaml
+                      kubectl apply -f k8s/mysql/service.yaml
+                    '''
+                }
+            }
         }
-        failure {
-            echo "ÉCHEC du pipeline."
+
+        stage('Deploy Spring Boot to Kubernetes') {
+            steps {
+                withCredentials([file(credentialsId: 'kubeconfig-cred', variable: 'KUBECONFIG')]) {
+                    sh '''
+                      kubectl apply -f k8s/spring/deployment.yaml
+                      kubectl apply -f k8s/spring/service.yaml
+                      kubectl rollout status deployment/student-management
+                    '''
+                }
+            }
+        }
+
+        stage('K8s Smoke Test') {
+            steps {
+                withCredentials([file(credentialsId: 'kubeconfig-cred', variable: 'KUBECONFIG')]) {
+                    sh '''
+                      kubectl get pods
+                      kubectl get svc
+                    '''
+                }
+            }
         }
     }
 }
+
