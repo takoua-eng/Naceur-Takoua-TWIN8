@@ -8,6 +8,13 @@ pipeline {
 
     stages {
 
+         stage('Checkout GIT') {
+            steps {
+                git branch: 'main',
+                    url: 'https://github.com/takoua-eng/Naceur-Takoua-TWIN8.git'
+            }
+        }
+
         stage('Checkout SCM') {
             steps {
                 checkout scm
