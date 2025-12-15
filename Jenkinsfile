@@ -53,7 +53,8 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 sh '''
-                    kubectl apply -f k8s/
+                    kubectl apply -f deployment.yaml -f mysql-deployment.yaml -f mysql-service.yaml -f service.yaml
+
                     kubectl rollout status deployment/student-management
                 '''
             }
