@@ -1,57 +1,72 @@
-
-}pipeline {
+pipeline {
     agent any
 
     environment {
         DOCKER_USER = 'takouanaceur'
-        IMAGE_NAME = 'student-management'
+        IMAGE_NAME  = 'student-management'
+        IMAGE_TAG   = 'latest'
     }
 
     stages {
 
-        stage('Checkout SCM') {
+        stage('Checkout Code') {
             steps {
                 checkout scm
             }
         }
 
-        stage('Build Maven') {
+        stage('Build with Maven') {
             steps {
                 sh 'mvn clean package -DskipTests'
             }
         }
 
-
-
         stage('Build Docker Image') {
             steps {
-                sh 'docker build -t $DOCKER_USER/$IMAGE_NAME:latest .'
+                sh '''
+                    docker build -t $DOCKER_USER/$IMAGE_NAME:$IMAGE_TAG .
+                '''
             }
         }
 
         stage('Login to Docker Hub') {
             steps {
-                withCredentials([string(credentialsId: 'docker-hub-token', variable: 'DOCKER_HUB_TOKEN')]) {
-                    sh 'echo $DOCKER_HUB_TOKEN | docker login -u $DOCKER_USER --password-stdin'
+                withCredentials([
+                    string(credentialsId: 'docker-hub-token', variable: 'DOCKER_HUB_TOKEN')
+                ]) {
+                    sh '''
+                        echo "$DOCKER_HUB_TOKEN" | \
+                        docker login -u "$DOCKER_USER" --password-stdin
+                    '''
                 }
             }
         }
 
         stage('Push Docker Image') {
             steps {
-                sh 'docker push $DOCKER_USER/$IMAGE_NAME:latest'
+                sh '''
+                    docker push $DOCKER_USER/$IMAGE_NAME:$IMAGE_TAG
+                '''
             }
         }
 
-        stage('K8s - Smoke Test') {
+        stage('Deploy to Kubernetes') {
             steps {
                 sh '''
-                kubectl version --client
-                kubectl config current-context
-                kubectl get nodes
-                kubectl get namespaces | head -n 20
+                    kubectl apply -f k8s/
+                    kubectl rollout status deployment/student-management
                 '''
             }
         }
     }
-    
+
+    post {
+        success {
+            echo '✅ Pipeline terminé avec succès'
+        }
+        failure {
+            echo '❌ Pipeline échoué'
+        }
+    }
+}
+
